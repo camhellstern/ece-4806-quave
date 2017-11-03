@@ -5,6 +5,6 @@ package org.firstinspires.ftc.teamcode;
  */
 
 public class Movement {
-    MovementNode[] moveP = new MovementNode[50];
+    public MovementNode[] moveP = new MovementNode[50];
     int size = 0;
 }

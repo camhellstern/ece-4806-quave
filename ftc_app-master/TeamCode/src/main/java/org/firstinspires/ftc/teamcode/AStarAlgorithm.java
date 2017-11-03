@@ -1,22 +1,57 @@
 package org.firstinspires.ftc.teamcode;
 
 
+import android.app.IntentService;
+import android.content.Intent;
+import android.os.Handler;
+
+import java.util.concurrent.LinkedBlockingQueue;
+
 /**
  * Created by Cameron on 10/1/2017.
  */
 
 public class AStarAlgorithm
 {
-    Node map[][] = new Node[27][19];
+    Node map[][] = new Node[10][10];
     int front = 0;
     int rear = 0;
-    Node openList[] = new Node[513];
+    Node mStart;
+    Node mGoal;
+    Node openList[] = new Node[100];
     priorityQueue closedList = new priorityQueue();
     //priorityQueue cf;
     priorityQueue path = new priorityQueue();
+    LinkedBlockingQueue<RoverMessage> mainQueue;
+
+    /*public AStarAlgorithm(){
+        super("AStarAlgorithm");
+    }
+
+    @Override
+    protected void onHandleIntent(Intent intent){
+        mainQueue = (LinkedBlockingQueue<RoverMessage>)intent.getSerializableExtra("mainQueue");
+        mStart = (Node)intent.getSerializableExtra("start");
+        mGoal = (Node)intent.getSerializableExtra("goal");
+        initialize();
+        priorityQueue p = new priorityQueue();
+        p = AStar(getCell(mStart.c.x, mStart.c.y), getCell(mGoal.c.x, mGoal.c.y));
+        Movement movePath = new Movement();
+        movePath = movementPath(p, 0.0);
+        RoverMessage msg = new RoverMessage();
+        msg.move = movePath;
+        try{
+            mainQueue.put(msg);
+            Thread.sleep(100);
+        } catch (InterruptedException e){
+            e.printStackTrace();
+        }
+
+
+    }*/
 
     public priorityQueue AStar(Node start, Node goal){
-        for(int a = 0;a<513;a++)
+        for(int a = 0;a<100;a++)
         {
             openList[a] = new Node();
         }
@@ -43,7 +78,7 @@ public class AStarAlgorithm
             {
                 neighbors[b] = new Node();
             }
-            if((current.c.x+1) <= 26)
+            if((current.c.x+1) <= 9)
                 neighbors[0] = map[current.c.x+1][current.c.y];
             else
             {
@@ -51,7 +86,7 @@ public class AStarAlgorithm
                 temp2.c.state = State.NOTHING;
                 neighbors[0] = temp2;
             }
-            if(((current.c.x+1) <= 26) && ((current.c.y+1) <= 18))
+            if(((current.c.x+1) <= 9) && ((current.c.y+1) <= 9))
                 neighbors[1] = map[current.c.x+1][current.c.y+1];
             else
             {
@@ -59,7 +94,7 @@ public class AStarAlgorithm
                 temp2.c.state = State.NOTHING;
                 neighbors[1] = temp2;
             }
-            if((current.c.y+1) <= 18)
+            if((current.c.y+1) <= 9)
                 neighbors[2] = map[current.c.x][current.c.y+1];
             else
             {
@@ -67,7 +102,7 @@ public class AStarAlgorithm
                 temp2.c.state = State.NOTHING;
                 neighbors[2] = temp2;
             }
-            if(((current.c.x-1) >= 0) && ((current.c.y+1) <= 18))
+            if(((current.c.x-1) >= 0) && ((current.c.y+1) <= 9))
                 neighbors[3] = map[current.c.x-1][current.c.y+1];
             else
             {
@@ -99,7 +134,7 @@ public class AStarAlgorithm
                 temp2.c.state = State.NOTHING;
                 neighbors[6] = temp2;
             }
-            if(((current.c.x+1) <= 26) && ((current.c.y-1) >= 0))
+            if(((current.c.x+1) <= 9) && ((current.c.y-1) >= 0))
                 neighbors[7] = map[current.c.x+1][current.c.y-1];
             else
             {
@@ -126,8 +161,8 @@ public class AStarAlgorithm
     }
 
     public void initialize() {
-        for (int x = 0; x < 27; x++) {
-            for (int y = 0; y < 19; y++) {
+        for (int x = 0; x < 10; x++) {
+            for (int y = 0; y < 10; y++) {
                 Node temp = new Node();
                 temp.c.g = 100000;
                 temp.c.f = 100000;
@@ -154,7 +189,7 @@ public class AStarAlgorithm
     }
     private void insert_by_priority(Node data)
     {
-        if (rear >= (20 - 1))
+        if (rear >= (100 - 1))
         {
             //printf("\nQueue overflow no more elements can be inserted");
             return;
