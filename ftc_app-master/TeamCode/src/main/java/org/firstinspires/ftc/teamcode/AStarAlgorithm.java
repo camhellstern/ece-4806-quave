@@ -56,7 +56,7 @@ public class AStarAlgorithm
             openList[a] = new Node();
         }
         create();
-        //initialize();
+        initialize();
         setG(start, 0);
         start.c.f = calculateH(start, goal);
         insert_by_priority(start);
@@ -173,7 +173,7 @@ public class AStarAlgorithm
                 map[x][y] = temp;
             }
         }
-        //path.size = 0;
+        path.size = 0;
         closedList.size = 0;
     }
 
@@ -355,11 +355,34 @@ public class AStarAlgorithm
 
         boolean firstTurnExists = false;
         if(isFirstUp && currDirection != 90.0){
-            firstTheta1 = 90;
+            if(currDirection == 180.0)
+            {
+                if(path.elements[1].c.y > path.elements[0].c.y)
+                    firstTheta1 = 270;
+                else
+                    firstTheta1 = 90;
+            }
+            else
+                firstTheta1 = 90;
             firstTurnExists = true;
         }
         else if(firstSlope == 0 && currDirection != 0.0){
-            firstTheta1 = 0;
+            if(currDirection == 90.0)
+            {
+                if(path.elements[1].c.x > path.elements[0].c.x)
+                    firstTheta1 = 180;
+                else
+                    firstTheta1 = 0;
+            }
+            else if(currDirection == 270.0)
+            {
+                if(path.elements[1].c.x > path.elements[0].c.x)
+                    firstTheta1 = 180;
+                else
+                    firstTheta1 = 360;
+            }
+            else
+                firstTheta1 = 0;
             firstTurnExists = true;
         }
         else if(firstSlope == 1 && currDirection != 45.0){

@@ -5,7 +5,7 @@ package org.firstinspires.ftc.teamcode;
  */
 
 enum MessageType{
-    OpDistance1, OpDistance2, OpDistance3, OpDistance4, MovementPath, PathRequest, CurrentPosition, Pixy1, Pixy2;
+    OpDistance1, OpDistance2, OpDistance3, MovementPath, PathRequest, Pixy1, Pixy2, PixyAligned, DataRequest;
 }
 
 public class RoverMessage {

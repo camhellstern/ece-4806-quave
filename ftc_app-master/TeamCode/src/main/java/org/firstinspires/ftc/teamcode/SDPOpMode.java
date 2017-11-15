@@ -33,7 +33,7 @@ import android.content.Intent;
 
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.Disabled;
-import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.hardware.AnalogInput;
 import com.qualcomm.robotcore.hardware.AnalogSensor;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -73,7 +73,7 @@ import java.util.concurrent.LinkedBlockingQueue;
  * Remove or comment out the @Disabled line to add this opmode to the Driver Station OpMode list
  */
 enum RoverState{
-    INIT, MOVE, IDLE, WAIT_FOR_SENSOR, PARKING
+    INIT, MOVE, IDLE, WAIT_FOR_SENSOR, PARKING, PARKED
 }
 
 enum MotorState{
@@ -81,7 +81,7 @@ enum MotorState{
 }
 
 @Autonomous(name="Pushbot: Senior Design Project", group="Pushbot")
-public class SDPOpMode extends LinearOpMode {
+public class SDPOpMode extends OpMode {
 
     /* Declare OpMode members. */
     HardwarePushbot         robot   = new HardwarePushbot();   // Use a Pushbot's hardware
@@ -98,24 +98,27 @@ public class SDPOpMode extends LinearOpMode {
     MotorState curMotor = MotorState.STAND_STILL;
     double curOp1 = 0;
     double curPixy1 = 0;
+    double curAngle = 0.0;
     boolean sent = false;
+    boolean curAligned = false;
+    boolean receiveOp1 = false;
+    Node curPos = new Node();
+    AnalogInput dist1;
+    AnalogInput dist2;
+    AnalogInput pixy1;
 
     static final double     COUNTS_PER_MOTOR_REV    = 1440 ;    // eg: TETRIX Motor Encoder
     static final double     DRIVE_GEAR_REDUCTION    = 2.0 ;     // This is < 1.0 if geared UP
     static final double     WHEEL_DIAMETER_INCHES   = 4.0 ;     // For figuring circumference
     static final double     COUNTS_PER_INCH         = (COUNTS_PER_MOTOR_REV * DRIVE_GEAR_REDUCTION) /
                                                       (WHEEL_DIAMETER_INCHES * 3.1415);
-    static final double     DRIVE_SPEED             = 0.6;
+    static final double     DRIVE_SPEED             = 0.4;
+    static final double     PARK_SPEED              = 0.6;
     static final double     TURN_SPEED              = 0.5;
 
 
     @Override
-    public void runOpMode() {
-
-        /*
-         * Initialize the drive system variables.
-         * The init() method of the hardware class does all the work here
-         */
+    public void init(){
         robot.init(hardwareMap);
 
         // Send telemetry message to signify robot waiting;
@@ -125,91 +128,141 @@ public class SDPOpMode extends LinearOpMode {
         robot.leftDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         robot.rightDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
 
-        robot.leftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        robot.rightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        //robot.leftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        //robot.rightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+
+        robot.leftDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        robot.rightDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+
+        // Send telemetry message to indicate successful Encoder reset
+        //telemetry.addData("Path0",  "Starting at %7d :%7d", robot.leftDrive.getCurrentPosition(), robot.rightDrive.getCurrentPosition());
+        //telemetry.update();
+
+        dist1 = hardwareMap.analogInput.get("dist1");
+        dist2 = hardwareMap.analogInput.get("dist2");
+
+        pixy1 = hardwareMap.analogInput.get("pixy1");
+
+        telemetry.update();
+        astar.initialize();
+        curPos.c.x = 0;
+        curPos.c.y = 0;
+    }
+
+    @Override
+    public void start(){
+        OpDistanceThread pixycam1 = new OpDistanceThread(mainQueue, pixy1, MessageType.Pixy1);
+        pixycam1.start();
+    }
+
+    @Override
+    public void loop() {
+
+        /*
+         * Initialize the drive system variables.
+         * The init() method of the hardware class does all the work here
+         */
+        /*robot.init(hardwareMap);
+
+        // Send telemetry message to signify robot waiting;
+        telemetry.addData("Status", "Resetting Encoders");    //
+        telemetry.update();
+
+        robot.leftDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        robot.rightDrive.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+
+        //robot.leftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        //robot.rightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+
+        robot.leftDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        robot.rightDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
 
         // Send telemetry message to indicate successful Encoder reset
         //telemetry.addData("Path0",  "Starting at %7d :%7d", robot.leftDrive.getCurrentPosition(), robot.rightDrive.getCurrentPosition());
         //telemetry.update();
 
         AnalogInput dist1 = hardwareMap.analogInput.get("dist1");
-
-        telemetry.addData("%s\n", dist1.getDeviceName());
+        AnalogInput dist2 = hardwareMap.analogInput.get("dist2");
 
         AnalogInput pixy1 = hardwareMap.analogInput.get("pixy1");
-        telemetry.addData("%s", pixy1.getDeviceName());
 
         telemetry.update();
+        astar.initialize();
+        curPos.c.x = 0;
+        curPos.c.y = 0;*/
 
         // Wait for the game to start (driver presses PLAY)
-        waitForStart();
+        //waitForStart();
 
-        OpDistanceThread op1 = new OpDistanceThread(mainQueue, dist1, MessageType.OpDistance1);
-        op1.start();
+        //OpDistanceThread op1 = new OpDistanceThread(mainQueue, dist1, MessageType.OpDistance1);
+        //op1.start();
 
-        OpDistanceThread pixycam1 = new OpDistanceThread(mainQueue, pixy1, MessageType.Pixy1);
-        pixycam1.start();
+        //OpDistanceThread pixycam1 = new OpDistanceThread(mainQueue, pixy1, MessageType.Pixy1);
+        //pixycam1.start();
 
-        PathThread path1 = new PathThread(mainQueue);
-        path1.start();
+        //PathThread path1 = new PathThread(mainQueue);
+        //path1.start();
 
-        sleep(1000);
+        //sleep(1000);
 
 
         //telemetry.addData("Starting Thread", "OpDistance Thread");
         //telemetry.update();
-        while(true)
-        {
-            RoverMessage msg = new RoverMessage();
-            try {
-                msg = mainQueue.take();
-                sleep(1000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+        //while(opModeIsActive())
+        //{
+            //telemetry.addData("Optical Distance Sensor Voltage", "%7f", dist1.getVoltage());
+            //telemetry.update();
+            //sleep(500);
+            if(mainQueue.size() != 0) {
+                RoverMessage msg = new RoverMessage();
+                try {
+                    msg = mainQueue.take();
+                    //sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
 
-            switch(msg.msgType){
-                case OpDistance1:
-                    telemetry.addData("Optical Distance Sensor Voltage", "%7f", msg.opDistVoltage);
-                    telemetry.update();
-                    curOp1 = msg.opDistVoltage;
-                    //RoverMessage pathRequest = new RoverMessage();
-                    //pathRequest.msgType = MessageType.PathRequest
-                    //Intent intent = new Intent(AStarAlgorithm.class);
-                    /*if(msg.opDistVoltage > 1.5) {
-                        encoderDrive(TURN_SPEED, 6, -6, 5.0);
-                        encoderDrive(DRIVE_SPEED, 12, 12, 5.0);
-                    }*/
-                    break;
-                case Pixy1:
-                    telemetry.addData("PixyCam Voltage", "%7f", msg.PixyCamVoltage);
-                    telemetry.update();
-                    curPixy1 = msg.PixyCamVoltage;
-                    break;
-                case MovementPath:
-                    pathCount = msg.move.size;
-                    curPath = msg.move;
-                    /*for(int l = 0; l < msg.move.size; l++){
-                        if(msg.move.moveP[l].movementType == MovementType.FORWARD)
-                            encoderDrive(DRIVE_SPEED, msg.move.moveP[l].dist, msg.move.moveP[l].dist, 5.0);  // S1: Forward 47 Inches with 5 Sec timeout
-                        else if(msg.move.moveP[l].movementType == MovementType.TURN_LEFT)
-                            encoderDrive(TURN_SPEED, -12, 12, 4.0);
-                        else if(msg.move.moveP[l].movementType == MovementType.TURN_RIGHT)
-                            encoderDrive(TURN_SPEED, 12, -12, 4.0);
-                    }*/
-                    break;
+                switch (msg.msgType) {
+                    case OpDistance1:
+                        curOp1 = msg.opDistVoltage;
+                        receiveOp1 = true;
+                        //RoverMessage pathRequest = new RoverMessage();
+                        //pathRequest.msgType = MessageType.PathRequest
+                        //Intent intent = new Intent(AStarAlgorithm.class);
+                        break;
+                    case Pixy1:
+                        //telemetry.addData("PixyCam Voltage", "%7f", msg.PixyCamVoltage);
+                        //telemetry.update();
+                        curPixy1 = msg.PixyCamVoltage;
+                        break;
+                    case PixyAligned:
+                        //telemetry.addData("PixyCam Aligned", "\n");
+                        //telemetry.update();
+                        curAligned = true;
+                        break;
+                    case MovementPath:
+                        pathCount = msg.move.size;
+                        curPath = msg.move;
+                        break;
+                }
             }
             if(curState == RoverState.INIT)
             {
                 RoverMessage pathRequest = new RoverMessage();
                 pathRequest.msgType = MessageType.PathRequest;
-
-                try {
-                    path1.pathQueue.put(pathRequest);
-                } catch (InterruptedException e){
-                    e.printStackTrace();
-                }
+                priorityQueue p;
+                p = astar.AStar(astar.getCell(0,0), astar.getCell(5,0));
+                Movement movePath;
+                /*MovementNode temp = new MovementNode();
+                temp.movementType = MovementType.FORWARD;
+                temp.dist = 12;
+                movePath.moveP[0] = temp;
+                movePath.size = 1;*/
+                movePath = astar.movementPath(p, curAngle);
+                pathCount = movePath.size;
+                curPath = movePath;
                 curState = RoverState.IDLE;
+                curPos.c.x = 1;
             }
 
             if(pathCount != 0)
@@ -234,85 +287,159 @@ public class SDPOpMode extends LinearOpMode {
 
                 encoderDrive(DRIVE_SPEED, targetX, targetY, 5.0);
             }
-            else if(pathCount == 0)
+            else if(pathCount == 0 && curState == RoverState.IDLE)
             {
                 curMotor = MotorState.STAND_STILL;
-                robot.leftDrive.setPower(0);
-                robot.rightDrive.setPower(0);
+                telemetry.addData("CurX CurY", "%d %d\n", curPos.c.x, curPos.c.y);
+                telemetry.update();
+                if(sent == true) {
+                    robot.leftDrive.setPower(0);
+                    robot.rightDrive.setPower(0);
 
-                // Turn off RUN_TO_POSITION
-                robot.leftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-                robot.rightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                    // Turn off RUN_TO_POSITION
+                    //robot.leftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                    //robot.rightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                }
                 sent = false;
+                //if(curPos.c.x == 1 && curPos.c.y == 0)
+                if(curAngle == 0.0)
+                {
+                    priorityQueue p;
+                    p = astar.AStar(astar.getCell(curPos.c.x,curPos.c.y), astar.getCell(curPos.c.x,curPos.c.y + 5));
+                    Movement movePath;
+                    /*MovementNode temp = new MovementNode();
+                    temp.movementType = MovementType.TURN_RIGHT;
+                    movePath.moveP[0] = temp;
+                    temp.movementType = MovementType.FORWARD;
+                    temp.dist = 12;
+                    movePath.moveP[1] = temp;
+                    movePath.size = 2;*/
+                    movePath = astar.movementPath(p, curAngle);
+                    pathCount = movePath.size;
+                    curPath = movePath;
+                    curState = RoverState.IDLE;
+                    //curPos.c.y = 1;
+                }
+                //else if(curPos.c.x == 1 && curPos.c.y == 1)
+                else if(curAngle == 90.0)
+                {
+                    priorityQueue p;
+                    p = astar.AStar(astar.getCell(curPos.c.x,curPos.c.y), astar.getCell(curPos.c.x - 5,curPos.c.y));
+                    for(int i=0;i<p.size;i++)
+                    {
+                        telemetry.addData("X Y", "%d %d\n", p.elements[i].c.x, p.elements[i].c.y);
+                    }
+                    telemetry.update();
+                    Movement movePath;
+                    movePath = astar.movementPath(p, curAngle);
+                    //Movement movePath = new Movement();
+                    /*MovementNode temp = new MovementNode();
+                    temp.movementType = MovementType.TURN_RIGHT;
+                    movePath.moveP[0] = temp;
+                    temp.movementType = MovementType.FORWARD;
+                    temp.dist = 12;
+                    movePath.moveP[1] = temp;
+                    movePath.size = 2;*/
+                    pathCount = movePath.size;
+                    curPath = movePath;
+                    curState = RoverState.IDLE;
+                    //curPos.c.x = 0;
+                }
+                //else if(curPos.c.x == 0 && curPos.c.y == 1)
+                else if(curAngle == 180.0)
+                {
+                    priorityQueue p;
+                    p = astar.AStar(astar.getCell(curPos.c.x,curPos.c.y), astar.getCell(curPos.c.x,curPos.c.y - 5));
+                    Movement movePath;
+                    movePath = astar.movementPath(p, curAngle);
+                    //Movement movePath = new Movement();
+                    /*MovementNode temp = new MovementNode();
+                    temp.movementType = MovementType.TURN_RIGHT;
+                    movePath.moveP[0] = temp;
+                    temp.movementType = MovementType.FORWARD;
+                    temp.dist = 12;
+                    movePath.moveP[1] = temp;
+                    movePath.size = 2;*/
+                    pathCount = movePath.size;
+                    curPath = movePath;
+                    curState = RoverState.IDLE;
+                    //curPos.c.y = 0;
+                }
+                //else if(curPos.c.x == 0 && curPos.c.y == 0)
+                else if(curAngle == 270.0)
+                {
+                    priorityQueue p;
+                    p = astar.AStar(astar.getCell(curPos.c.x,curPos.c.y), astar.getCell(curPos.c.x+5,curPos.c.y));
+                    Movement movePath;
+                    movePath = astar.movementPath(p, curAngle);
+                    /*Movement movePath = new Movement();
+                    MovementNode temp = new MovementNode();
+                    temp.movementType = MovementType.TURN_RIGHT;
+                    movePath.moveP[0] = temp;
+                    temp.movementType = MovementType.FORWARD;
+                    temp.dist = 12;
+                    movePath.moveP[1] = temp;
+                    movePath.size = 2;*/
+                    pathCount = movePath.size;
+                    curPath = movePath;
+                    curState = RoverState.IDLE;
+                    //curPos.c.x = 1;
+                }
             }
 
-            if(curPixy1 > 1.63 && curPixy1 < 1.67 && curState == RoverState.IDLE)
+            if(curAligned && (curState == RoverState.IDLE) && (curPath.moveP[0].movementType == MovementType.FORWARD))
             {
                 pathCount = 0;
                 curMotor = MotorState.STAND_STILL;
-                robot.leftDrive.setPower(0);
-                robot.rightDrive.setPower(0);
-                // Turn off RUN_TO_POSITION
-                robot.leftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-                robot.rightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                    robot.leftDrive.setPower(0);
+                    robot.rightDrive.setPower(0);
+                    // Turn off RUN_TO_POSITION
+                    //robot.leftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                    //robot.rightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                 curState = RoverState.WAIT_FOR_SENSOR;
+                /*RoverMessage n = new RoverMessage();
+                n.msgType = MessageType.DataRequest;
+                try{
+                    op1.myQueue.put(n);
+                    sleep(500);
+                } catch (InterruptedException e){
+                    e.printStackTrace();
+                }*/
+                curAligned = false;
             }
 
-            if(curState == RoverState.WAIT_FOR_SENSOR && curOp1 < 0.5)
+            if(curState == RoverState.WAIT_FOR_SENSOR && dist1.getVoltage() <= 1.25)
             {
                 Movement turnIn = new Movement();
+                MovementNode up = new MovementNode();
                 MovementNode first = new MovementNode();
                 MovementNode second = new MovementNode();
+                up.movementType = MovementType.FORWARD;
+                up.dist = 10;
+                turnIn.moveP[0] = up;
                 first.movementType = MovementType.TURN_RIGHT;
-                turnIn.moveP[0] = first;
+                turnIn.moveP[1] = first;
                 second.movementType = MovementType.FORWARD;
                 second.dist = 12;
-                turnIn.moveP[1] = second;
+                turnIn.moveP[2] = second;
                 turnIn.size = 2;
-                pathCount = 2;
+                pathCount = 3;
                 curPath = turnIn;
                 sent = false;
                 curState = RoverState.PARKING;
             }
-        }
-        // Step through each leg of the path,
-        // Note: Reverse movement is obtained by setting a negative distance (not speed)
-        /*telemetry.addData("Initializing","A*");
-        telemetry.update();
+            else if(curState == RoverState.WAIT_FOR_SENSOR && dist1.getVoltage() > 1.25)
+            {
+                pathCount = curPath.size;
+                curState = RoverState.IDLE;
+            }
+            //idle();
+        //}
+    }
 
-        astar.initialize();
-        telemetry.addData("A*","Initialized");
-        telemetry.update();
-        p = astar.AStar(astar.getCell(0, 0), astar.getCell(2,2));
+    @Override
+    public void stop(){
 
-        Movement movePath = new Movement();
-        movePath = astar.movementPath(p, 0.0);
-
-        for(int l = 0; l < movePath.size; l++){
-            if(movePath.moveP[l].movementType == MovementType.FORWARD)
-                encoderDrive(DRIVE_SPEED, movePath.moveP[l].dist, movePath.moveP[l].dist, 5.0);  // S1: Forward 47 Inches with 5 Sec timeout
-            else if(movePath.moveP[l].movementType == MovementType.TURN_LEFT)
-                encoderDrive(TURN_SPEED, -12, 12, 4.0);
-            else if(movePath.moveP[l].movementType == MovementType.TURN_RIGHT)
-                encoderDrive(TURN_SPEED, 12, -12, 4.0);
-        }*/
-        //sleep(1000);
-        /*if(p.elements[1].c.x == 1 && p.elements[1].c.y == 0) {
-            encoderDrive(DRIVE_SPEED, 48, 48, 5.0);  // S1: Forward 47 Inches with 5 Sec timeout
-            encoderDrive(TURN_SPEED, 12, -12, 4.0);  // S2: Turn Right 12 Inches with 4 Sec timeout
-            encoderDrive(DRIVE_SPEED, -24, -24, 4.0);  // S3: Reverse 24 Inches with 4 Sec timeout
-
-            sleep(1000);     // pause for servos to move
-
-            telemetry.addData("A*", "Passed");
-            telemetry.update();
-        }
-        else
-        {
-            encoderDrive(DRIVE_SPEED, 10, 10, 5.0);
-            telemetry.addData("A*", "Failed");
-            telemetry.update();
-        }*/
     }
 
     /*
@@ -330,7 +457,7 @@ public class SDPOpMode extends LinearOpMode {
         int newRightTarget;
 
         // Ensure that the opmode is still active
-        if (opModeIsActive()) {
+        //if (opModeIsActive()) {
 
             switch(curMotor){
                 case STAND_STILL:
@@ -338,8 +465,8 @@ public class SDPOpMode extends LinearOpMode {
                     robot.rightDrive.setPower(0);
 
                     // Turn off RUN_TO_POSITION
-                    robot.leftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-                    robot.rightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                    //robot.leftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                    //robot.rightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                     if(robot.leftDrive.getCurrentPosition() != robot.leftDrive.getTargetPosition() || robot.rightDrive.getCurrentPosition() != robot.rightDrive.getTargetPosition())
                     {
                         curMotor = MotorState.MOVE;
@@ -354,6 +481,26 @@ public class SDPOpMode extends LinearOpMode {
                     if(!robot.leftDrive.isBusy() || !robot.rightDrive.isBusy())
                     {
                         curMotor = MotorState.STAND_STILL;
+                        if(curPath.moveP[0].movementType == MovementType.FORWARD)
+                        {
+                            if(curAngle == 0.0)
+                                curPos.c.x = curPos.c.x + (int)(curPath.moveP[0].dist/24);
+                            else if(curAngle == 90.0)
+                                curPos.c.y = curPos.c.y + (int)(curPath.moveP[0].dist/24);
+                            else if(curAngle == 180.0)
+                                curPos.c.x = curPos.c.x - (int)(curPath.moveP[0].dist/24);
+                            else if(curAngle == 270.0)
+                                curPos.c.y = curPos.c.y - (int)(curPath.moveP[0].dist/24);
+                        }
+                        if(curPath.moveP[0].movementType == MovementType.TURN_RIGHT)
+                            curAngle = curAngle - 90;
+                        else if(curPath.moveP[0].movementType == MovementType.TURN_LEFT)
+                        {
+                            if(curAngle == 270.0)
+                                curAngle = 0;
+                            else
+                                curAngle = curAngle + 90;
+                        }
                         for(int k=0;k<pathCount - 1;k++)
                         {
                             curPath.moveP[k] = curPath.moveP[k+1];
@@ -363,46 +510,6 @@ public class SDPOpMode extends LinearOpMode {
                     }
                     break;
             }
-            // Determine new target position, and pass to motor controller
-            /*newLeftTarget = robot.leftDrive.getCurrentPosition() + (int)(leftInches * COUNTS_PER_INCH);
-            newRightTarget = robot.rightDrive.getCurrentPosition() + (int)(rightInches * COUNTS_PER_INCH);
-            robot.leftDrive.setTargetPosition(newLeftTarget);
-            robot.rightDrive.setTargetPosition(newRightTarget);
-
-            // Turn On RUN_TO_POSITION
-            robot.leftDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-            robot.rightDrive.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-
-            // reset the timeout time and start motion.
-            runtime.reset();
-            robot.leftDrive.setPower(Math.abs(speed));
-            robot.rightDrive.setPower(Math.abs(speed));
-
-            // keep looping while we are still active, and there is time left, and both motors are running.
-            // Note: We use (isBusy() && isBusy()) in the loop test, which means that when EITHER motor hits
-            // its target position, the motion will stop.  This is "safer" in the event that the robot will
-            // always end the motion as soon as possible.
-            // However, if you require that BOTH motors have finished their moves before the robot continues
-            // onto the next step, use (isBusy() || isBusy()) in the loop test.
-            while (opModeIsActive() &&
-                   (runtime.seconds() < timeoutS) &&
-                   (robot.leftDrive.isBusy() && robot.rightDrive.isBusy())) {
-
-                // Display it for the driver.
-                //telemetry.addData("Path1",  "Running to %7d :%7d", newLeftTarget,  newRightTarget);
-                //telemetry.addData("Path2",  "Running at %7d :%7d", robot.leftDrive.getCurrentPosition(), robot.rightDrive.getCurrentPosition());
-                //telemetry.update();
-            }
-
-            // Stop all motion;
-            robot.leftDrive.setPower(0);
-            robot.rightDrive.setPower(0);
-
-            // Turn off RUN_TO_POSITION
-            robot.leftDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-            robot.rightDrive.setMode(DcMotor.RunMode.RUN_USING_ENCODER);*/
-
-            //  sleep(250);   // optional pause after each move
-        }
+        //}
     }
 }
