@@ -99,6 +99,8 @@ public class SDPOpMode extends OpMode {
     double curOp1 = 0;
     double curPixy1 = 0;
     double curAngle = 0.0;
+    double tempAngle = 0.0;
+    int spotCount = 0;
     boolean sent = false;
     boolean curAligned = false;
     boolean receiveOp1 = false;
@@ -262,7 +264,7 @@ public class SDPOpMode extends OpMode {
                 pathCount = movePath.size;
                 curPath = movePath;
                 curState = RoverState.IDLE;
-                curPos.c.x = 1;
+                //curPos.c.x += 5;
             }
 
             if(pathCount != 0)
@@ -289,9 +291,10 @@ public class SDPOpMode extends OpMode {
             }
             else if(pathCount == 0 && curState == RoverState.IDLE)
             {
+                spotCount = 0;
                 curMotor = MotorState.STAND_STILL;
-                telemetry.addData("CurX CurY", "%d %d\n", curPos.c.x, curPos.c.y);
-                telemetry.update();
+                //telemetry.addData("CurAngle", "%f\n", curAngle);
+                //telemetry.update();
                 if(sent == true) {
                     robot.leftDrive.setPower(0);
                     robot.rightDrive.setPower(0);
@@ -306,6 +309,7 @@ public class SDPOpMode extends OpMode {
                 {
                     priorityQueue p;
                     p = astar.AStar(astar.getCell(curPos.c.x,curPos.c.y), astar.getCell(curPos.c.x,curPos.c.y + 5));
+                    //p = astar.AStar(astar.getCell(5, 0), astar.getCell(5,5));
                     Movement movePath;
                     /*MovementNode temp = new MovementNode();
                     temp.movementType = MovementType.TURN_RIGHT;
@@ -315,20 +319,18 @@ public class SDPOpMode extends OpMode {
                     movePath.moveP[1] = temp;
                     movePath.size = 2;*/
                     movePath = astar.movementPath(p, curAngle);
-                    pathCount = movePath.size;
+                    pathCount = 2;
                     curPath = movePath;
                     curState = RoverState.IDLE;
                     //curPos.c.y = 1;
+                    tempAngle = 90.0;
                 }
                 //else if(curPos.c.x == 1 && curPos.c.y == 1)
                 else if(curAngle == 90.0)
                 {
                     priorityQueue p;
                     p = astar.AStar(astar.getCell(curPos.c.x,curPos.c.y), astar.getCell(curPos.c.x - 5,curPos.c.y));
-                    for(int i=0;i<p.size;i++)
-                    {
-                        telemetry.addData("X Y", "%d %d\n", p.elements[i].c.x, p.elements[i].c.y);
-                    }
+                    //p = astar.AStar(astar.getCell(5,5), astar.getCell(0,5));
                     telemetry.update();
                     Movement movePath;
                     movePath = astar.movementPath(p, curAngle);
@@ -340,16 +342,18 @@ public class SDPOpMode extends OpMode {
                     temp.dist = 12;
                     movePath.moveP[1] = temp;
                     movePath.size = 2;*/
-                    pathCount = movePath.size;
+                    pathCount = 2;
                     curPath = movePath;
                     curState = RoverState.IDLE;
                     //curPos.c.x = 0;
+                    tempAngle = 180.0;
                 }
                 //else if(curPos.c.x == 0 && curPos.c.y == 1)
                 else if(curAngle == 180.0)
                 {
                     priorityQueue p;
                     p = astar.AStar(astar.getCell(curPos.c.x,curPos.c.y), astar.getCell(curPos.c.x,curPos.c.y - 5));
+                    //p = astar.AStar(astar.getCell(0,5), astar.getCell(0,0));
                     Movement movePath;
                     movePath = astar.movementPath(p, curAngle);
                     //Movement movePath = new Movement();
@@ -360,16 +364,18 @@ public class SDPOpMode extends OpMode {
                     temp.dist = 12;
                     movePath.moveP[1] = temp;
                     movePath.size = 2;*/
-                    pathCount = movePath.size;
+                    pathCount = 2;
                     curPath = movePath;
                     curState = RoverState.IDLE;
                     //curPos.c.y = 0;
+                    tempAngle = 270.0;
                 }
                 //else if(curPos.c.x == 0 && curPos.c.y == 0)
                 else if(curAngle == 270.0)
                 {
                     priorityQueue p;
                     p = astar.AStar(astar.getCell(curPos.c.x,curPos.c.y), astar.getCell(curPos.c.x+5,curPos.c.y));
+                    //p = astar.AStar(astar.getCell(0,0), astar.getCell(5,0));
                     Movement movePath;
                     movePath = astar.movementPath(p, curAngle);
                     /*Movement movePath = new Movement();
@@ -380,11 +386,13 @@ public class SDPOpMode extends OpMode {
                     temp.dist = 12;
                     movePath.moveP[1] = temp;
                     movePath.size = 2;*/
-                    pathCount = movePath.size;
+                    pathCount = 2;
                     curPath = movePath;
                     curState = RoverState.IDLE;
                     //curPos.c.x = 1;
+                    tempAngle = 0.0;
                 }
+                //curAngle = tempAngle;
             }
 
             if(curAligned && (curState == RoverState.IDLE) && (curPath.moveP[0].movementType == MovementType.FORWARD))
@@ -406,6 +414,7 @@ public class SDPOpMode extends OpMode {
                     e.printStackTrace();
                 }*/
                 curAligned = false;
+                spotCount++;
             }
 
             if(curState == RoverState.WAIT_FOR_SENSOR && dist1.getVoltage() <= 1.25)
@@ -430,7 +439,7 @@ public class SDPOpMode extends OpMode {
             }
             else if(curState == RoverState.WAIT_FOR_SENSOR && dist1.getVoltage() > 1.25)
             {
-                pathCount = curPath.size;
+                pathCount = 1;
                 curState = RoverState.IDLE;
             }
             //idle();
@@ -498,8 +507,12 @@ public class SDPOpMode extends OpMode {
                         {
                             if(curAngle == 270.0)
                                 curAngle = 0;
-                            else
-                                curAngle = curAngle + 90;
+                            else if(curAngle == 0.0)
+                                curAngle = 90;
+                            else if(curAngle == 90.0)
+                                curAngle = 180.0;
+                            else if(curAngle == 180.0)
+                                curAngle = 270.0;
                         }
                         for(int k=0;k<pathCount - 1;k++)
                         {
@@ -507,6 +520,8 @@ public class SDPOpMode extends OpMode {
                         }
                         pathCount--;
                         sent = false;
+                        telemetry.addData("Path Count: ", "%d\n", pathCount);
+                        telemetry.update();
                     }
                     break;
             }
